@@ -1,0 +1,149 @@
+<template>
+	<view class="content">
+
+		<view class="area">
+			<button type="primary" @click="changeLazyLoad">懒加载开关：{{lazyLoad ? '开启中' : '关闭中'}}</button>
+			<button type="primary" @click="changeCache">缓存开关：{{cache ? '开启中' : '关闭中'}}</button>
+			<button type="primary" @click="removeImageCache">清楚缓存</button>
+		</view>
+
+
+		<scroll-view :scroll-with-animation="true" :show-scrollbar="false" @scroll="listScroll" :scroll-y="true"
+			:style="{height: (listInfo.h + 'px')}" style="background-color: palegoldenrod;">
+			<view class="gallEry">
+				<view :style="'width:' + imgW  + 'px'" class="gallEryBox" v-for="(numVal, index) in flowData.column"
+					:key="numVal">
+					<view :style="'width:' + imgW  + 'px'" class="gallEryBox_item"
+						v-for="(item, j) in flowData[`column_${index + 1}`]" :key="item.src.split('/').pop()">
+						<Joshua-lazyLoad-cache-image bgColor='rgba(0,0,0,.2)' :duration="1000" :lazyLoad="lazyLoad"
+							:listInfo="listInfo" bgHeight="100px" :width="imgW + 'px'" :cache="cache" fatherTop="60"
+							className="imgBox" :src='item.src' :nvueLazyLoadBottomNumber="300">
+						</Joshua-lazyLoad-cache-image>
+					</view>
+				</view>
+			</view>
+
+		</scroll-view>
+	</view>
+</template>
+
+<script>
+	import {
+		screenSizeGrid,
+		dynamicGrouping
+	} from '@/common/oneself.js'
+	import imgArr from '@/common/img.js'
+	export default {
+		data() {
+			return {
+				imageList: [],
+				lazyLoad: uni.getStorageSync('lazyLoad'),
+				cache: uni.getStorageSync('cache'),
+				flowData: {
+					column: 2
+				},
+				pageW: 0,
+				listInfo: {
+					y: 0,
+					h: 0
+				}
+			}
+		},
+		onLoad() {
+			this.getData()
+			this.listInfo.h = uni.getSystemInfoSync().windowHeight - 60
+		},
+		onShow() {
+			this.getColnum()
+		},
+		computed: {
+			imgW() {
+				return ((this.pageW - 10) - ((this.flowData.column - 1) * 10)) / this.flowData.column
+			}
+		},
+		methods: {
+			listScroll(e) {
+				this.listInfo.y = e.detail.scrollTop
+			},
+			getColnum() {
+				const screenState = screenSizeGrid();
+				screenState.subscribeToUpdates(() => {
+					this.pageW = screenState.getWindowWidth()
+					this.flowData.column = screenState.getColumn() + 1
+					this.changeColumn()
+				});
+			},
+			changeColumn() {
+				let groupList = dynamicGrouping(this.imageList, this.flowData.column);
+				groupList.forEach((item, i) => (this.flowData[`column_${i + 1}`] = item))
+			},
+			changeCache() {
+				this.cache = !this.cache
+				uni.setStorageSync('cache', this.cache)
+				plus.runtime.restart()
+			},
+			changeLazyLoad() {
+				this.lazyLoad = !this.lazyLoad
+				uni.setStorageSync('lazyLoad', this.lazyLoad)
+				plus.runtime.restart()
+			},
+			getData() {
+				this.imageList = imgArr.map(url => ({
+					src: url
+				}))
+				this.getColnum()
+			},
+			async removeImageCache() {
+				uni.clearStorage()
+				uni.setStorageSync('lazyLoad', this.lazyLoad)
+				uni.setStorageSync('cache', this.cache)
+				const res = await uni.getSavedFileList()
+				const fileList = res && res.fileList;
+				if (!fileList.length) return
+				fileList.forEach((file, index) => {
+					uni.removeSavedFile({
+						filePath: file.filePath
+					}).then(res => {
+						if (index == fileList.length - 1) {
+							plus.runtime.restart()
+						}
+					})
+				})
+			}
+
+		}
+	}
+</script>
+
+<style lang="scss">
+	.imgBox {
+		border: 1px solid #000;
+		overflow: hidden;
+	}
+
+
+	.area {
+		display: flex;
+		justify-content: space-around;
+		flex-direction: row;
+		flex-wrap: wrap;
+		height: 60px;
+	}
+
+	.gallEry {
+		display: flex;
+		justify-content: space-between;
+		flex-direction: row;
+		width: 750rpx;
+		padding: 0 10rpx;
+	}
+
+	.gallEryBox {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.gallEryBox_item {
+		margin-bottom: 10px;
+	}
+</style>
